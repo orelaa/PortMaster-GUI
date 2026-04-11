@@ -12,7 +12,7 @@ mkdir trimui_build
 cd trimui_build
 
 if [[ "$1" == "stable" ]]; then
-    wget "https://github.com/PortsMaster/PortMaster-GUI/releases/latest/download/version.json"
+    wget "https://github.com/orelaa/PortMaster-GUI/releases/latest/download/version.json"
 
     if [[ ! -f "version.json" ]]; then
         echo "Missing version.json file."
