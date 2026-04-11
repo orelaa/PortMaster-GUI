@@ -134,7 +134,11 @@ DEVICE_RAM=$(free | awk '/Mem:/ { printf("%.0f", ($2 / 1024 / 1024)) }')
 if [[ "$CFW_NAME" == "EmuELEC" ]]; then
     DEVICE_NAME=$(grep -a '^COREELEC_DEVICE=".*"' /etc/os-release | cut -d'"' -f 2)
 elif [[ "$CFW_NAME" == "TrimUI" ]]; then
-    DEVICE_NAME="TrimUI Smart Pro"
+    if grep -qi "sun55iw3" "/sys/firmware/devicetree/base/model"; then
+        DEVICE_NAME="TrimUI Smart Pro S"
+    else
+        DEVICE_NAME="TrimUI Smart Pro"
+    fi
 elif [ -f "$HOME/.config/.CUSTOM_DEVICE" ]; then
     DEVICE_NAME=$(cat "$HOME/.config/.CUSTOM_DEVICE")
 elif [ -f "$HOME/.config/.DEVICE" ]; then
@@ -411,7 +415,13 @@ case "$(echo "$DEVICE_NAME" | tr '[:upper:]' '[:lower:]')" in
             ANALOG_STICKS=0
         fi
         ;;
-
+    
+    "trimui smart pro s"|"trimui-smart-pro-s")
+        DEVICE_CPU="a523"
+        DEVICE_NAME="TrimUI Smart Pro S"
+        DEVICE_HAS_ARMHF="Y"
+        ;;
+        
     "r36s"|"r35s/r36s")
         DEVICE_CPU="RK3326"
         DEVICE_NAME="R36S"

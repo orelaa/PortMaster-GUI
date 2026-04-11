@@ -162,3 +162,17 @@ pm_platform_helper() {
     # DO SOMETHING HERE
     printf ""
 }
+
+pm_run_armhf() {
+    if [[ -n "$PM_ARMHF_LOADER" ]] && [[ -f "$PM_ARMHF_LOADER" ]]; then
+        # unset 64bit PortMaster
+        unset LD_PRELOAD
+        
+        # replace current process
+        exec "$PM_ARMHF_LOADER" --library-path "$PM_ARMHF_LIBDIR" "$@"
+    else
+        # Fallback:
+        unset LD_PRELOAD
+        exec "$@"
+    fi
+}

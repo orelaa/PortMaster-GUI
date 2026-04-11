@@ -9,7 +9,10 @@ CUR_TTY=/dev/tty0
 export controlfolder="/mnt/SDCARD/Apps/PortMaster/PortMaster"
 export directory="mnt/SDCARD/Data"
 
-source /mnt/SDCARD/System/etc/ex_config
+# For TSP Crossmix
+if [[ -f "/mnt/SDCARD/System/etc/ex_config" ]]; then
+    source "/mnt/SDCARD/System/etc/ex_config"
+fi
 
 PM_SCRIPTNAME="$(basename "${PM_SCRIPTNAME:-$0}")"
 PM_PORTNAME="${PM_SCRIPTNAME%.sh}"
@@ -20,22 +23,44 @@ fi
 
 export ESUDO=""
 export ESUDOKILL="-1" # for 351Elec and EmuELEC use "-1" (numeric one) or "-k" 
-export SDL_GAMECONTROLLERCONFIG_FILE="/$controlfolder/gamecontrollerdb.txt"
+export SDL_GAMECONTROLLERCONFIG_FILE="$controlfolder/gamecontrollerdb.txt"
 # export SDL_GAMECONTROLLERCONFIG=$(grep "Deeplay" "/usr/lib/gamecontrollerdb.txt")
 
 get_controls() {
-  sdl2imgshow \
-      -i "$EX_RESOURCE_PATH/background.png" \
-      -f "$EX_RESOURCE_PATH/DejaVuSans.ttf" \
+  
+  local show_bin="$controlfolder/sdl2imgshow.aarch64"
+  
+  if [[ ! -x "$show_bin" ]]; then
+      return
+  fi
+  
+  local font_file=""
+	if [[ -f "$controlfolder/utils/patcher/assets/font/PeaberryBase.ttf" ]]; then
+        font_file="$controlfolder/utils/patcher/assets/font/PeaberryBase.ttf"
+    elif [[ -n "$EX_RESOURCE_PATH" ]] && [[ -f "$EX_RESOURCE_PATH/DejaVuSans.ttf" ]]; then
+        font_file="$EX_RESOURCE_PATH/DejaVuSans.ttf"
+    fi
+	
+	[[ -z "$font_file" ]] && return
+  
+  "$show_bin" \
+      -i "$controlfolder/resources/background.png" \
+      -f "$font_file" \
       -s 48 \
       -c "0,0,0" \
       -t "Launching $PM_PORTNAME" &
 
   sleep 0.5
-  pkill -f sdl2imgshow
+  pkill -f "$show_bin" 2>/dev/null || true
 }
 
 source $controlfolder/device_info.txt
+# 32bit for Smart Pro S
+if [[ "$DEVICE_NAME" == *"Smart Pro S"* ]] || [[ "$DEVICE_NAME" == "trimui-smart-pro-s" ]]; then
+    PM_ARMHF_LIBDIR="$controlfolder/libs_armhf"
+    PM_ARMHF_LOADER="$PM_ARMHF_LIBDIR/ld-linux-armhf.so.3"
+    export PM_ARMHF_LIBDIR PM_ARMHF_LOADER
+fi
 source $controlfolder/funcs.txt
 
 export GPTOKEYB2="$ESUDO env LD_PRELOAD=$controlfolder/libinterpose.aarch64.so $controlfolder/gptokeyb2 $ESUDOKILL"

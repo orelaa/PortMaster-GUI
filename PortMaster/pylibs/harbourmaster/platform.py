@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
+import shlex
 
 from gettext import gettext as _
 from pathlib import Path
@@ -1073,11 +1074,15 @@ class PlatformTrimUI(PlatformBase):
 
         if port_mode == 'roms':
             target_file = ROM_SCRIPT_DIR / (port_script.name)
-            if not os.path.samefile(port_script, target_file):
-                logger.debug(f"Copying {str(port_script)} to {str(target_file)}")
-                shutil.copy(port_script, target_file)
+            if os.path.exists(port_script) and os.path.exists(target_file):
+                if not os.path.samefile(port_script, target_file):
+                    logger.debug(f"Copying {str(port_script)} to {str(target_file)}")
+                    shutil.copy(port_script, target_file)
+                else:
+                    logger.debug(f"Skipping copy of {str(port_script)} to {str(target_file)} as they are the same file")
             else:
-                logger.debug(f"Skipping copy of {str(port_script)} to {str(target_file)} as they are the same file")
+                logger.debug(f"Copying {port_script} to {target_file} (target doesn't exist)")
+                shutil.copy(port_script, target_file)
 
         elif port_mode == 'ports':
             new_port_dir = PORT_DIR / f"portmaster-{name_cleaner(port_script.stem)}"
@@ -1091,7 +1096,7 @@ class PlatformTrimUI(PlatformBase):
                     .replace("{{PORTTITLE}}", port_script.stem)
                     .replace("{{PORTNAME}}", new_port_dir.name.lower())
                     ## A-PEH ESC-A-PEH
-                    .replace("{{PORTSCRIPT}}", str(port_script).replace(' ', '\\\\ ')))
+                    .replace("{{PORTSCRIPT}}", shlex.quote(str(port_script))))
 
     def remove_port_script(self, port_script):
         ROM_SCRIPT_DIR = Path("/mnt/SDCARD/Roms/PORTS")
@@ -1154,90 +1159,210 @@ class PlatformTrimUI(PlatformBase):
 
     def gamelist_add(self, gameinfo_file):
         if not gameinfo_file.is_file():
+            logger.error(f"gamelist_add: gameinfo_file not found: {gameinfo_file}")
             return
 
         port_mode = self.hm.cfg_data.get('trimui-port-mode', 'roms')
+        logger.info(f"gamelist_add: port_mode={port_mode}, gameinfo={gameinfo_file}")
 
         ROM_IMAGE_DIR  = Path("/mnt/SDCARD/Imgs/PORTS")
         ROM_SCRIPT_DIR = Path("/mnt/SDCARD/Roms/PORTS")
         PORT_DIR       = Path("/mnt/SDCARD/Ports")
 
-        logger.debug(f"Processing {gameinfo_file}")
-
         self.added_ports.add('GAMELIST UPDATER')
 
         with self.gamelist_backup() as gamelist_xml:
             if gamelist_xml is None:
+                logger.error("gamelist_add: gamelist_backup returned None")
                 return
 
-            gameinfo_tree = ET.parse(gameinfo_file)
-            gameinfo_root = gameinfo_tree.getroot()
+            logger.debug(f"Parsing: {gameinfo_file}")
 
-            for gameinfo_element in gameinfo_tree.findall('game'):
+            try:
+                gameinfo_tree = ET.parse(gameinfo_file)
+                gameinfo_root = gameinfo_tree.getroot()
+                games_list = gameinfo_tree.findall('game')
+                logger.info(f"Parsed XML with standard parser. Found {len(games_list)} <game> entries.")
+            except (ImportError, ET.ParseError) as e:
+                logger.warning(f"Standard XML parser unavailable ({e}). Switching to regex fallback.")
+                # Fallback stok TSPS
+                import re
+                with open(gameinfo_file, 'r', encoding='utf-8') as f:
+                    xml_content = f.read()
+
+                game_blocks = re.findall(r'<game>(.*?)</game>', xml_content, re.DOTALL)
+                games_list = []
+                for block in game_blocks:
+                    path_m = re.search(r'<path>(.*?)</path>', block)
+                    name_m = re.search(r'<name>(.*?)</name>', block)
+                    image_m = re.search(r'<image>(.*?)</image>', block)
+
+                    # Создаём объект-заглушку, полностью совместимый с ET.Element.find()
+                    class _MockGameElement:
+                        def __init__(self, path, name, image):
+                            self._path = path.strip() if path else None
+                            self._name = name.strip() if name else None
+                            self._image = image.strip() if image else None
+                        def find(self, tag):
+                            val = getattr(self, f'_{tag}', None)
+                            if val is None:
+                                return None
+                            # Возвращаем объект с атрибутом .text, как у ET.Element
+                            return type('ETText', (), {'text': val})()
+
+                    games_list.append(_MockGameElement(
+                        path=path_m.group(1) if path_m else None,
+                        name=name_m.group(1) if name_m else None,
+                        image=image_m.group(1) if image_m else None
+                    ))
+
+            for idx, gameinfo_element in enumerate(games_list):
+                
                 port_script = gameinfo_element.find('path').text
-
+                
                 port_script_file = self.hm.scripts_dir / port_script
 
                 if not port_script_file.is_file():
-                    logger.debug(f"Cant find {port_script}")
-                    continue
+
+                    if self.hm.scripts_dir.exists():
+                        logger.debug(f"     Contents of scripts_dir: {list(self.hm.scripts_dir.iterdir())[:10]}") 
+
+                    alt_path = Path(port_script)
+                    if alt_path.is_absolute() and alt_path.is_file():
+                        logger.info(f"Found script at absolute path: {alt_path}")
+                        port_script_file = alt_path
+                    else:
+                        continue
 
                 if port_script.startswith('./'):
                     port_script = port_script[2:]
+                    logger.debug(f"  Stripped './' prefix: '{port_script}'")
 
                 port_title = gameinfo_element.find('name')
                 if port_title is None:
-                    logger.debug(f"Cant find name tag for {port_script}")
+                    logger.warning(f"No <name> tag for {port_script}, using stem: {port_script_file.stem}")
                     port_title = port_script_file.stem
                 else:
                     port_title = port_title.text.strip()
+                    logger.debug(f"  Port title: '{port_title}'")
 
                 port_image = gameinfo_element.find('image')
+                image_file = None
+                
                 if port_image is not None:
-                    port_image = port_image.text.strip()
-                    if port_image.startswith('./'):
-                        port_image = port_image[2:]
+                    raw_image_path = port_image.text.strip()
+                    logger.debug(f"  Raw image path from XML: '{raw_image_path}'")
+                    
+                    if raw_image_path.startswith('./'):
+                        raw_image_path = raw_image_path[2:]
+                        logger.debug(f"  Stripped './' prefix: '{raw_image_path}'")
 
-                    image_file = self.hm.ports_dir / port_image
-                    if not image_file.is_file():
-                        logger.debug(f"Cant find image file {image_file}")
-                        image_file = None
+                    possible_paths = [
+                        self.hm.ports_dir / raw_image_path,           # Относительно ports_dir
+                        Path(raw_image_path),                          # Абсолютный или относительно CWD
+                        self.hm.scripts_dir.parent / raw_image_path,   # Относительно родителя scripts_dir
+                    ]
+                    
+                    for candidate in possible_paths:
+                        logger.debug(f"  Checking image candidate: {candidate} (exists={candidate.is_file()})")
+                        if candidate.is_file():
+                            image_file = candidate
+                            logger.info(f"Found image at: {image_file}")
+                            break
+                    
+                    if image_file is None:
+                        logger.warning(f"  Image not found in any candidate path")
+                        logger.debug(f"     ports_dir={self.hm.ports_dir}, exists={self.hm.ports_dir.exists()}")
+                        if self.hm.ports_dir.exists():
 
-                    logger.info(f"{port_image}: {image_file}")
+                            stem = Path(raw_image_path).stem
+                            matches = [f for f in self.hm.ports_dir.rglob(f"{stem}*") if f.suffix.lower() in ['.png', '.jpg', '.jpeg']]
+                            if matches:
+                                logger.debug(f"  Similar files found: {matches}")
                 else:
-                    logger.debug(f"Cant find image tag.")
-                    image_file = None
+                    logger.debug(f"  No <image> tag in XML")
 
-                logger.debug(f"{port_mode} -- {image_file}")
+                logger.debug(f"  Final image_file: {image_file}")
+                logger.debug(f"  port_mode: {port_mode}")
 
+                # === Копирование в зависимости от режима ===
                 if port_mode == 'roms':
+                    
                     if image_file is not None:
                         target_file = ROM_IMAGE_DIR / (port_script_file.stem + "-pre" + image_file.suffix)
-                        logger.debug(f"Copying {str(image_file)} to {str(target_file)}")
-                        shutil.copy(image_file, target_file)
+                        
+                        if not ROM_IMAGE_DIR.exists():
+                            logger.warning(f"  ROM_IMAGE_DIR does not exist, attempting to create: {ROM_IMAGE_DIR}")
+                            try:
+                                ROM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+                                logger.info(f"   Created directory: {ROM_IMAGE_DIR}")
+                            except Exception as e:
+                                logger.error(f"   Failed to create ROM_IMAGE_DIR: {e}")
+                        
+                        try:
+                            shutil.copy(image_file, target_file)
+                            logger.info(f"   Image copied successfully: {target_file}")
+                        except PermissionError as e:
+                            logger.error(f"   Permission denied copying image: {e}")
+                        except Exception as e:
+                            logger.error(f"   Failed to copy image: {type(e).__name__}: {e}")
+                    else:
+                        logger.warning(f"   Skipping image copy: image_file is None")
 
                     target_file = ROM_SCRIPT_DIR / (port_script_file.name)
-                    logger.debug(f"Copying {str(port_script_file)} to {str(target_file)}")
-                    shutil.copy(port_script_file, target_file)
+                    logger.debug(f"   Script copy: src={port_script_file}, dst={target_file}")
+                    
+                    if not ROM_SCRIPT_DIR.exists():
+                        try:
+                            ROM_SCRIPT_DIR.mkdir(parents=True, exist_ok=True)
+                            logger.info(f"   Created directory: {ROM_SCRIPT_DIR}")
+                        except Exception as e:
+                            logger.error(f"   Failed to create ROM_SCRIPT_DIR: {e}")
+                    
+                    try:
+                        shutil.copy(port_script_file, target_file)
+                        logger.info(f"   Script copied successfully: {target_file}")
+                    except Exception as e:
+                        logger.error(f"   Failed to copy script: {type(e).__name__}: {e}")
 
                 elif port_mode == 'ports':
+                    
                     new_port_dir = PORT_DIR / f"portmaster-{name_cleaner(port_script_file.stem)}"
+                    logger.debug(f"   Creating port directory: {new_port_dir}")
+                    
+                    try:
+                        new_port_dir.mkdir(0o755, parents=True, exist_ok=True)
+                        logger.info(f"   Directory created/exists: {new_port_dir}")
+                    except Exception as e:
+                        logger.error(f"   Failed to create port directory: {e}")
+                        continue
 
-                    new_port_dir.mkdir(0o755, parents=True, exist_ok=True)
-
-                    logger.debug(f"Creating {str(new_port_dir / 'config.json')}")
-                    with open(new_port_dir / "config.json", "w") as fh:
-                        fh.write(
-                            PORT_CONFIG_JSON
-                            .replace("{{PORTTITLE}}", port_title)
-                            .replace("{{PORTNAME}}", new_port_dir.name.lower())
-                            ## A-PEH ESC-A-PEH
-                            .replace("{{PORTSCRIPT}}", str(port_script_file).replace(' ', '\\\\ ')))
+                    config_path = new_port_dir / "config.json"
+                    logger.debug(f"   Writing config: {config_path}")
+                    try:
+                        with open(config_path, "w") as fh:
+                            content = (
+                                PORT_CONFIG_JSON
+                                .replace("{{PORTTITLE}}", port_title)
+                                .replace("{{PORTNAME}}", new_port_dir.name.lower())
+                                .replace("{{PORTSCRIPT}}", shlex.quote(str(port_script_file)))
+                            )
+                            fh.write(content)
+                        logger.info(f"   Config written: {config_path}")
+                    except Exception as e:
+                        logger.error(f"   Failed to write config: {e}")
+                        continue
 
                     if image_file is not None:
                         target_file = new_port_dir / ("icon-pre" + image_file.suffix)
-                        logger.debug(f"Copying {str(image_file)} to {str(target_file)}")
-                        shutil.copy(image_file, target_file)
+                        logger.debug(f"  🖼 Icon copy: src={image_file}, dst={target_file}")
+                        try:
+                            shutil.copy(image_file, target_file)
+                            logger.info(f"   Icon copied successfully: {target_file}")
+                        except Exception as e:
+                            logger.error(f"   Failed to copy icon: {e}")
+                    else:
+                        logger.warning(f"   Skipping icon copy: image_file is None")
 
 
 class PlatformMiyoo(PlatformBase):

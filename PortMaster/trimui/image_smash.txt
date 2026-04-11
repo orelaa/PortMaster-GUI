@@ -7,11 +7,39 @@
 if [ -f "/mnt/SDCARD/System/bin/gm" ]; then
     source /mnt/SDCARD/System/etc/ex_config
 
-    find "/mnt/SDCARD/Imgs/PORTS/" -type f \( -iname "*-pre.jpg" -o -iname "*-pre.png" \) -exec sh -c 'input="{}"; output="$(echo "$input" | sed "s/\(.*\)-pre\..*/\1/").png"; gm convert "$input" -resize "244x244>" -format png "$output"; rm -vf "$input"' \;
+    # Обработка изображений в Imgs/PORTS/ с изменением размера и переименованием
+    find "/mnt/SDCARD/Imgs/PORTS/" -type f \( -iname "*-pre.jpg" -o -iname "*-pre.png" \) -exec sh -c '
+        input="{}";
+        output="$(echo "$input" | sed "s/\(.*\)-pre\..*/\1/").png";
+        gm convert "$input" -resize "244x244>" -format png "$output" && rm -vf "$input"
+    ' \;
 
-    find "/mnt/SDCARD/Ports/" -type f \( -iname "*-pre.jpg" -o -iname "*-pre.png" \) -exec sh -c 'input="{}"; output="$(echo "$input" | sed "s/\(.*\)\..*/\1/").png"; rename="$(echo "$input" | sed "s/\(.*\)-pre\..*/\1/").png"; gm mogrify -verbose -resize "170x170>" -gravity center -extent 195x195 -gravity north -extent 300x300 -background none -format png "$input"; mv -vf "$output" "$rename"' \;
+    # Обработка изображений в Ports/ с изменением размера, обрезкой и переименованием
+    find "/mnt/SDCARD/Ports/" -type f \( -iname "*-pre.jpg" -o -iname "*-pre.png" \) -exec sh -c '
+        input="{}";
+        rename="$(echo "$input" | sed "s/\(.*\)-pre\..*/\1/").png";
+        gm mogrify -verbose -resize "170x170>" -gravity center -extent 195x195 -gravity north -extent 300x300 -background none -format png "$input" && mv -vf "$input" "$rename"
+    ' \;
+else
+    # Если gm отсутствует — только переименование без изменения размеров
+    echo "GraphicsMagick (gm) не найден. Выполняется только переименование файлов."
+
+    # Переименование в Imgs/PORTS/
+    find "/mnt/SDCARD/Imgs/PORTS/" -type f \( -iname "*-pre.jpg" -o -iname "*-pre.png" \) -exec sh -c '
+        input="{}";
+        output="$(echo "$input" | sed "s/\(.*\)-pre\..*/\1/").png";
+        mv -vf "$input" "$output"
+    ' \;
+
+    # Переименование в Ports/
+    find "/mnt/SDCARD/Ports/" -type f \( -iname "*-pre.jpg" -o -iname "*-pre.png" \) -exec sh -c '
+        input="{}";
+        output="$(echo "$input" | sed "s/\(.*\)-pre\..*/\1/").png";
+        mv -vf "$input" "$output"
+    ' \;
 fi
 
+# Удаление кэша, если файл существует
 if [ -f /mnt/SDCARD/Roms/PORTS/PORTS_cache7.db ]; then
     rm -f /mnt/SDCARD/Roms/PORTS/PORTS_cache7.db
 fi

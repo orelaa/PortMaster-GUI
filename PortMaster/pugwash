@@ -79,9 +79,31 @@ if not (Path(__file__).parent / '.git').is_dir() and not (Path(__file__).parent 
 
 if not (PYLIB_PATH / 'resources' / 'NotoSansTC-Regular.ttf').is_file():
     ## Extract Noto fonts.
-    with tarfile.open(str(PYLIB_PATH / 'resources' / 'NotoSans.tar.xz'), 'r:xz') as tar:
-        # Extract all contents into the specified directory
-        tar.extractall(str(PYLIB_PATH / 'resources'))
+    archive = PYLIB_PATH / 'resources' / 'NotoSans.tar.xz'
+    
+    try:
+        # 1. For -LZMA
+        with tarfile.open(str(archive), 'r:xz') as tar:
+            tar.extractall(path=str(PYLIB_PATH / 'resources'))
+    except (tarfile.CompressionError, ImportError):
+        # 2. If not _LZMA_AVAILABLE then pipe-metod (stock TSPS)
+        try:
+            with open(str(archive), 'rb') as f_in:
+                proc = subprocess.Popen(
+                    ['xz', '-dc'],
+                    stdin=f_in,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+
+                with tarfile.open(fileobj=proc.stdout, mode='r|') as tar:
+                    tar.extractall(path=str(PYLIB_PATH / 'resources'))
+                proc.wait()
+                if proc.returncode != 0:
+                    raise RuntimeError(proc.stderr.read().decode().strip())
+        except Exception as e:
+            print(f"CRITICAL: Failed to extract NotoSans fonts: {e}", file=sys.stderr)
+            sys.exit(1)
 
 
 ## HACK D:
@@ -734,6 +756,7 @@ class PortMasterGUI(pySDL2gui.GUI, harbourmaster.Callback):
     def get_config(self):
         cfg_dir = harbourmaster.HM_TOOLS_DIR / "PortMaster"
         cfg_file = cfg_dir / "config" / "config.json"
+        cfg_file.parent.mkdir(parents=True, exist_ok=True)
         cfg_data = {}
 
         if self.hm is None:
