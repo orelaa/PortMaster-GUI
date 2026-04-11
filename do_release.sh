@@ -128,7 +128,7 @@ if [[ "$1" == "stable" ]] || [ "$MAKE_INSTALL" = "Y" ]; then
 fi
 
 if [[ ! -f "version.json" ]]; then
-    wget "https://github.com/PortsMaster/PortMaster-GUI/releases/latest/download/version.json"
+    wget "https://github.com/orelaa/PortMaster-GUI/releases/latest/download/version.json"
 fi
 
 python3 tools/pm_version.py $*
