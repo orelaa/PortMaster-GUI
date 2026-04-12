@@ -22,32 +22,7 @@ source $controlfolder/control.txt
 
 cd "$controlfolder"
 
-# === НАСТРОЙКА ПОДРОБНОГО ЛОГА ===
-LOG_FILE="$controlfolder/log.txt"
-
-# Очищаем лог при каждом запуске (замените > на >>, если нужно сохранять историю)
-> "$LOG_FILE"
-
-# Заголовок с системной информацией
-{
-  echo "=== PortMaster Start ==="
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Script: $0"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] PWD: $PWD"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] USER: $(whoami 2>/dev/null || echo 'unknown')"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] controlfolder: $controlfolder"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] directory: $directory"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] SHELL: $SHELL"
-  echo "========================="
-} >> "$LOG_FILE" 2>&1
-
-# Перенаправляем ВСЕ последующие stdout и stderr в лог
-exec >> "$LOG_FILE" 2>&1
-
-# 🔥 Включаем трассировку: логируется каждая выполняемая команда и раскрытие переменных
-set -x
-# === КОНЕЦ НАСТРОЙКИ ЛОГА ===
-##exec >> "$controlfolder/log.txt" 2>&1
-#> "$controlfolder/log.txt" && exec > >(tee "$controlfolder/log.txt") 2>&1
+> "$controlfolder/log.txt" && exec > >(tee "$controlfolder/log.txt") 2>&1
 
 export TERM=linux
 chmod 666 $CUR_TTY
