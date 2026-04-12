@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
-import shlex
 
 from gettext import gettext as _
 from pathlib import Path
@@ -1096,7 +1095,7 @@ class PlatformTrimUI(PlatformBase):
                     .replace("{{PORTTITLE}}", port_script.stem)
                     .replace("{{PORTNAME}}", new_port_dir.name.lower())
                     ## A-PEH ESC-A-PEH
-                    .replace("{{PORTSCRIPT}}", shlex.quote(str(port_script))))
+                    .replace("{{PORTSCRIPT}}", re.sub(r'([ \(\)&;\'\"\`\$])', r'\\\\\1', str(port_script))))
 
     def remove_port_script(self, port_script):
         ROM_SCRIPT_DIR = Path("/mnt/SDCARD/Roms/PORTS")
@@ -1345,7 +1344,7 @@ class PlatformTrimUI(PlatformBase):
                                 PORT_CONFIG_JSON
                                 .replace("{{PORTTITLE}}", port_title)
                                 .replace("{{PORTNAME}}", new_port_dir.name.lower())
-                                .replace("{{PORTSCRIPT}}", shlex.quote(str(port_script_file)))
+                                .replace("{{PORTSCRIPT}}", re.sub(r'([ \(\)&;\'\"\`\$])', r'\\\\\1', str(port_script_file)))
                             )
                             fh.write(content)
                         logger.info(f"   Config written: {config_path}")
