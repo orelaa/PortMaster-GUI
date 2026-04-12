@@ -31,27 +31,24 @@ get_controls() {
   local show_bin="$controlfolder/sdl2imgshow.aarch64"
   
   if [[ ! -x "$show_bin" ]]; then
-      return
+    return
   fi
   
-  local font_file=""
-	if [[ -f "$controlfolder/utils/patcher/assets/font/PeaberryBase.ttf" ]]; then
-        font_file="$controlfolder/utils/patcher/assets/font/PeaberryBase.ttf"
-    elif [[ -n "$EX_RESOURCE_PATH" ]] && [[ -f "$EX_RESOURCE_PATH/DejaVuSans.ttf" ]]; then
-        font_file="$EX_RESOURCE_PATH/DejaVuSans.ttf"
-    fi
-	
-	[[ -z "$font_file" ]] && return
+  if [[ ! -f "$controlfolder/utils/patcher/assets/font/PeaberryBase.ttf" ]]; then
+    return
+  fi
   
   "$show_bin" \
       -i "$controlfolder/resources/background.png" \
-      -f "$font_file" \
+      -f "$controlfolder/utils/patcher/assets/font/PeaberryBase.ttf" \
       -s 48 \
       -c "0,0,0" \
       -t "Launching $PM_PORTNAME" &
-
+  SPLASH_PID=$!
   sleep 0.5
-  pkill -f "$show_bin" 2>/dev/null || true
+  kill $SPLASH_PID 2>/dev/null
+  wait $SPLASH_PID 2>/dev/null
+  printf "\033c" > /dev/tty0 2>/dev/null
 }
 
 source $controlfolder/device_info.txt
