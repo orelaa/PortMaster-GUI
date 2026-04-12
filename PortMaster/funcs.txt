@@ -137,9 +137,15 @@ pm_message() {
     PortMasterDialog "message" "$1"
 }
 
-pm_gptokeyb_finish() {
-    $ESUDO pkill -9 -f gptokeyb
-    $ESUDO pkill -9 -f gptokeyb2
+pm_gptokeyb_finish() {   
+    for pid in $(pidof gptokeyb 2>/dev/null); do
+        $ESUDO kill -9 "$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+    done
+    for pid in $(pidof gptokeyb2 2>/dev/null); do
+        $ESUDO kill -9 "$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+    done
 }
 
 

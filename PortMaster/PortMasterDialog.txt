@@ -7,15 +7,21 @@ if [ ! -z "$PM_PIPE" ]; then
   return
 fi
 
-if [ ! -d "/dev/shm/portmaster" ]; then
-  $ESUDO mkdir /dev/shm/portmaster
+if [ -d "/dev/shm" ] && [ -w "/dev/shm" ]; then
+    export PM_FIFO_DIR="/dev/shm/portmaster"
+elif [ -w "/tmp" ]; then
+    export PM_FIFO_DIR="/tmp/portmaster"
 else
-  $ESUDO rm -f /dev/shm/portmaster/pm_*
+    export PM_FIFO_DIR="$controlfolder/.fifo"
 fi
+mkdir -p "$PM_FIFO_DIR" 2>/dev/null || {
+    PM_FIFO_DIR="${GAMEDIR:-$controlfolder}/.pm_fifo"
+    mkdir -p "$PM_FIFO_DIR"
+}
+rm -f "$PM_FIFO_DIR"/pm_* "$PM_FIFO_DIR"/hm_* "$PM_FIFO_DIR"/pg_* 2>/dev/null
 
-# HarbourMaster pipe commands
-PM_PIPE="/dev/shm/portmaster/pm_input"
-PM_DONE="/dev/shm/portmaster/pm_done"
+PM_PIPE="$PM_FIFO_DIR/pm_input"
+PM_DONE="$PM_FIFO_DIR/pm_done"
 PM_PID=""
 
 if [ -z "$PYSDL2_DLL_PATH" ]; then
