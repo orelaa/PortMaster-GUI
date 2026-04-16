@@ -1020,6 +1020,13 @@ class PlatformTrimUI(PlatformBase):
 
         logger.debug(f'Copy {TU_DIR / "control.txt"} -> {CONTROL_HACK}')
         shutil.copy(TU_DIR / "control.txt", CONTROL_HACK)
+        
+        RA_HACK = Path("/usr/bin/retroarch")
+        if not RA_HACK.parent.is_dir():
+            RA_HACK.parent.mkdir(parents=True)
+
+        logger.debug(f'Copy {TU_DIR / "retroarch"} -> {RA_HACK}')
+        shutil.copy(TU_DIR / "retroarch", RA_HACK)
 
         # PEBKAC
         logger.debug(f'Move {TU_DIR / "PortMaster.txt"} -> {self.hm.tools_dir / "launch.sh"}')

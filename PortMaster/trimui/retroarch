@@ -1,0 +1,19 @@
+#!/bin/sh
+# RetroArch Wrapper for TSPS
+
+REAL_RA="/mnt/SDCARD/RetroArch/ra64.trimui"
+RA_CONF="/mnt/SDCARD/RetroArch/retroarch.cfg"
+
+if [ ! -f "$REAL_RA" ]; then
+    exit 1
+fi
+
+if [ -z "$HOME" ] || [ "$HOME" = "/" ]; then
+    export HOME="/mnt/SDCARD/Data/home"
+fi
+
+
+#RA_DEFAULT_ARGS="--input-driver linuxraw --menu_driver rgui --no-append-config"
+
+cd "/mnt/SDCARD/RetroArch"
+exec "$REAL_RA" --config "$RA_CONF" ${RA_DEFAULT_ARGS:-} "$@"
