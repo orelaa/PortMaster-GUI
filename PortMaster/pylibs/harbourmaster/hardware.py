@@ -214,7 +214,7 @@ CPU_INFO = {
     "h700-muos":     {"capabilities": ["armhf", "aarch64"], "primary_arch": "aarch64"},
     "h700":          {"capabilities": ["armhf", "aarch64"], "primary_arch": "aarch64"},
     "a133plus":      {"capabilities": ["aarch64"],          "primary_arch": "aarch64"},
-    "a523":          {"capabilities": ["armhf", "aarch64"], "primary_arch": "aarch64"},
+    "a523":          {"capabilities": ["aarch64"],          "primary_arch": "aarch64"},
     "x86_64":        {"capabilities": ["x86_64"],           "primary_arch": "x86_64"},
     "s922x":         {"capabilities": ["aarch64"],          "primary_arch": "aarch64"},
     "sd865":         {"capabilities": ["armhf", "aarch64"], "primary_arch": "aarch64"},
@@ -254,12 +254,6 @@ def cpu_info_v2(info):
             Path('/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2').exists()):
         info["capabilities"].append("x86_64")
         info['primary_arch'] = "x86_64"
-     
-    # Only for Trimui Smart Pro S
-    if info.get('device') == 'trimui-smart-pro-s':
-        if "armhf" not in info["capabilities"]:
-            info["capabilities"].append("armhf")
-            info['primary_arch'] = "aarch64"
 
     if HM_TESTING or 'primary_arch' not in info:
         info["capabilities"].append("armhf")

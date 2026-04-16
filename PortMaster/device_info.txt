@@ -419,7 +419,6 @@ case "$(echo "$DEVICE_NAME" | tr '[:upper:]' '[:lower:]')" in
     "trimui smart pro s"|"trimui-smart-pro-s")
         DEVICE_CPU="a523"
         DEVICE_NAME="TrimUI Smart Pro S"
-        DEVICE_HAS_ARMHF="Y"
         ;;
         
     "r36s"|"r35s/r36s")

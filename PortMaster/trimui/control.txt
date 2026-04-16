@@ -45,19 +45,13 @@ get_controls() {
       -c "0,0,0" \
       -t "Launching $PM_PORTNAME" &
   SPLASH_PID=$!
-  sleep 0.5
-  kill $SPLASH_PID 2>/dev/null
-  wait $SPLASH_PID 2>/dev/null
+  sleep 1
+  kill -9 $SPLASH_PID 2>/dev/null
+  sleep 0.2
   printf "\033c" > /dev/tty0 2>/dev/null
 }
 
 source $controlfolder/device_info.txt
-# 32bit for Smart Pro S
-if [[ "$DEVICE_NAME" == *"Smart Pro S"* ]] || [[ "$DEVICE_NAME" == "trimui-smart-pro-s" ]]; then
-    PM_ARMHF_LIBDIR="$controlfolder/libs_armhf"
-    PM_ARMHF_LOADER="$PM_ARMHF_LIBDIR/ld-linux-armhf.so.3"
-    export PM_ARMHF_LIBDIR PM_ARMHF_LOADER
-fi
 source $controlfolder/funcs.txt
 
 export GPTOKEYB2="$ESUDO env LD_PRELOAD=$controlfolder/libinterpose.aarch64.so $controlfolder/gptokeyb2 $ESUDOKILL"
