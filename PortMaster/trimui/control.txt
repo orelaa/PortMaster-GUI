@@ -18,7 +18,7 @@ PM_SCRIPTNAME="$(basename "${PM_SCRIPTNAME:-$0}")"
 PM_PORTNAME="${PM_SCRIPTNAME%.sh}"
 
 if [ -z "$PM_PORTNAME" ]; then
-  PM_PORTNAME="Port"
+    PM_PORTNAME="Port"
 fi
 
 export ESUDO=""
@@ -27,28 +27,32 @@ export SDL_GAMECONTROLLERCONFIG_FILE="$controlfolder/gamecontrollerdb.txt"
 # export SDL_GAMECONTROLLERCONFIG=$(grep "Deeplay" "/usr/lib/gamecontrollerdb.txt")
 
 get_controls() {
-  
-  local show_bin="$controlfolder/sdl2imgshow.aarch64"
-  
-  if [[ ! -x "$show_bin" ]]; then
-    return
-  fi
-  
-  if [[ ! -f "$controlfolder/utils/patcher/assets/font/PeaberryBase.ttf" ]]; then
-    return
-  fi
-  
-  "$show_bin" \
-      -i "$controlfolder/resources/background.png" \
-      -f "$controlfolder/utils/patcher/assets/font/PeaberryBase.ttf" \
-      -s 48 \
-      -c "0,0,0" \
-      -t "Launching $PM_PORTNAME" &
-  SPLASH_PID=$!
-  sleep 1
-  kill -9 $SPLASH_PID 2>/dev/null
-  sleep 0.2
-  printf "\033c" > /dev/tty0 2>/dev/null
+
+    local DEVICE=""
+
+    if grep -q "TRIMUI Player1" /proc/bus/input/devices 2>/dev/null; then
+        DEVICE="030000005e0400008e02000014010000"
+    fi
+
+    local SDLDB="$controlfolder/gamecontrollerdb.txt"
+    export SDL_GAMECONTROLLERCONFIG_FILE="/tmp/pm_gamecontrollerdb.txt"
+
+    if [[ -n "$DEVICE" && -f "$SDLDB" ]]; then
+        # grep -e "$DEVICE" "$SDLDB" > "$SDL_GAMECONTROLLERCONFIG_FILE" 2>/dev/null || true
+        #invert A-B, X-Y from Xbox360 (Trimui)
+        grep -e "$DEVICE" "$SDLDB" 2>/dev/null | sed \
+            -e 's/a:b0/a:_TMPA_/g' -e 's/b:b1/b:b0/g' -e 's/a:_TMPA_/a:b1/g' \
+            -e 's/x:b2/x:_TMPX_/g' -e 's/y:b3/y:b2/g' -e 's/x:_TMPX_/x:b3/g' \
+            > "$SDL_GAMECONTROLLERCONFIG_FILE" || true
+    fi
+
+    if [[ ! -s "$SDL_GAMECONTROLLERCONFIG_FILE" && -f "$SDLDB" ]]; then
+        cp -f "$SDLDB" "$SDL_GAMECONTROLLERCONFIG_FILE"
+    fi
+    
+    touch "$SDL_GAMECONTROLLERCONFIG_FILE"
+    sdl_controllerconfig="$(< "$SDL_GAMECONTROLLERCONFIG_FILE" 2>/dev/null || echo "")"
+    export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 }
 
 source $controlfolder/device_info.txt
